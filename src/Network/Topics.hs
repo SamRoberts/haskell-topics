@@ -51,13 +51,26 @@ instance Eq (Instruction (FetchResponse v)) where
 showConstructor outerFixity constructor child =
   showParen (outerFixity >= 10) (showString (constructor ++ " ") . showsPrec 10 child)
 
+-- | A request to get the first and last offset available for a given topic
 type OffsetsRequest = Request ReplicaId ()
+
+-- | The response giving the first and last offsets available for a given topic
 type OffsetsResponse = Response CommonError (Offset, Offset)
 
+-- | A request to send a list of messages to Kaka
 type ProduceRequest v = Request ProduceConfig [v]
-type ProduceResponse = Response (Either CommonError FetchError) Offset
 
+-- | The response after sending a list of messages to Kafka
+--
+-- The offset returned is the offset of the first message sent to Kafka.
+type ProduceResponse = Response (Either CommonError FetchError) Offset
+-- TODO Is zip [responseOffset..] requestMessageList a valid way of determining offset for each message?
+--      or is it possible that some other produce request's messages could be interleaved with mine?
+
+-- | A request to fetch some messages from Kafka
 type FetchRequest = Request FetchConfig FetchInfo
+
+-- | The response coming back from a fetch request to Kafka
 type FetchResponse v = Response (Either CommonError FetchError) (FetchData v)
 
 data Request c a = Request
