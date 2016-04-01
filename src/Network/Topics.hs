@@ -14,7 +14,6 @@ import           Data.Text (Text)
 import           Network.Kafka.Protocol (Deserializable, Serializable)
 import qualified Network.Kafka.Protocol as KP
 
--- FIXME: need some way of representing commonalities between different errors
 import           Text.Show (showParen, showString)
 
 -- | syntax for interacting with kafka
