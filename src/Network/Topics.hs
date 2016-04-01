@@ -15,6 +15,7 @@ import           Network.Kafka.Protocol (Deserializable, Serializable)
 import qualified Network.Kafka.Protocol as KP
 
 -- FIXME: need some way of representing commonalities between different errors
+import           Text.Show (showParen, showString)
 
 -- | syntax for interacting with kafka
 data Instruction a where
@@ -24,16 +25,19 @@ data Instruction a where
   Fetch :: Kafkaesque v => FetchRequest -> Instruction (FetchResponse v)
 
 instance Show (Instruction Topic) where
-  show (GetTopic name) = "GetTopic " ++ show name
+  showsPrec fixity (GetTopic name) = showConstructor fixity "GetTopic" name
 
 instance Show (Instruction OffsetsResponse) where
-  show (GetOffsets request) = "GetOffsets " ++ show request
+  showsPrec fixity (GetOffsets request) = showConstructor fixity "GetOffsets" request
 
 instance Show (Instruction ProduceResponse) where
-  show (Produce request) = "Produce " ++ show request
+  showsPrec fixity (Produce request) = showConstructor fixity "Produce" request
 
 instance Show (Instruction (FetchResponse v)) where
-  show (Fetch request) = "Fetch " ++ show request
+  showsPrec fixity (Fetch request) = showConstructor fixity "Fetch" request
+
+showConstructor outerFixity constructor child =
+  showParen (outerFixity >= 10) (showString (constructor ++ " ") . showsPrec 10 child)
 
 type OffsetsRequest = Request ReplicaId ()
 type OffsetsResponse = Response CommonError (Offset, Offset)
