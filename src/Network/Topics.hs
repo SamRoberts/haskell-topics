@@ -35,6 +35,19 @@ instance Show (Instruction ProduceResponse) where
 instance Show (Instruction (FetchResponse v)) where
   showsPrec fixity (Fetch request) = showConstructor fixity "Fetch" request
 
+instance Eq (Instruction Topic) where
+  (GetTopic name1) == (GetTopic name2) = name1 == name2
+
+instance Eq (Instruction OffsetsResponse) where
+  (GetOffsets request1) == (GetOffsets request2) = request1 == request2
+
+-- FIXME can't have Eq here as v could be different
+--instance Eq (Instruction ProduceResponse) where
+--  (Produce request1) == (Produce request2) = request1 == request2
+
+instance Eq (Instruction (FetchResponse v)) where
+  (Fetch request1) == (Fetch request2) = request1 == request2
+
 showConstructor outerFixity constructor child =
   showParen (outerFixity >= 10) (showString (constructor ++ " ") . showsPrec 10 child)
 
