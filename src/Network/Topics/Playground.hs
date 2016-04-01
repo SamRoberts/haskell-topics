@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveFunctor, ScopedTypeVariables, GeneralizedNewtypeDeriving, LambdaCase #-}
 
-module Lib where
+-- | A module to play around with the low level details of communicating with Kafka.
+--
+-- This module is not actually used. I use milena for real Kafka interaction.
+module Network.Topics.Playground where
     -- FIXME: want a qualified export list at some point, but easier to play around without one
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
-    -- ( someFunc
-    -- ) where
 
 import           Control.Applicative (liftA2)
 import           Data.Binary (Binary, get, put)
