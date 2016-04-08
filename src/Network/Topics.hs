@@ -109,7 +109,7 @@ data FetchData v = FetchData
 -- | Common errors shared by many Kafka responses
 data CommonError = Unknown -- ^ Unknown error, no further information
                  | UnknownTopicOrPartition -- ^ The topic or partition does not exist
-                 | NotLeaderForPartition -- ^ The request was sent to the current leader for this partition
+                 | NotLeaderForPartition -- ^ The request was not sent to the current leader for this partition
                  deriving (Show, Eq)
 
 -- | Errors for Produce requests
