@@ -5,7 +5,8 @@ module Network.Topics where
     -- FIXME: want a qualified export list at some point, but easier to play around without one
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
---import           Control.Monad.Operational (Program, ProgramT)
+import           Control.Monad.Operational (Program, ProgramT)
+import qualified Control.Monad.Operational as Op
 
 import           Data.ByteString (ByteString)
 import           Data.Int (Int16, Int32, Int64)
@@ -18,14 +19,26 @@ import           Network.Kafka.Protocol (Deserializable, Serializable)
 import           Text.Show (showParen, showString)
 
 -- | A monad transformer for Kafka interactions
---type TopicsT m a = ProgramT Instruction m a
+type TopicsT m a = ProgramT Instruction m a
 
 -- | A monad for interacting with Kafka
---type Topics a = Program Instruction a
+type Topics a = Program Instruction a
+
+getTopic :: TopicName -> ProgramT Instruction m (Maybe Topic)
+getTopic = Op.singleton . GetTopic
+
+getOffsets :: OffsetsRequest -> ProgramT Instruction m OffsetsResponse
+getOffsets = Op.singleton . GetOffsets
+
+produce :: Kafkaesque v => ProduceRequest v -> ProgramT Instruction m ProduceResponse
+produce = Op.singleton . Produce
+
+fetch :: Kafkaesque v => FetchRequest -> ProgramT Instruction m (FetchResponse v)
+fetch = Op.singleton . Fetch
 
 -- | syntax for interacting with kafka
 data Instruction a where
-  GetTopic :: TopicName -> Instruction Topic -- ^ Retrieve a topic reference and metadata for a given topic name
+  GetTopic :: TopicName -> Instruction (Maybe Topic) -- ^ Retrieve a topic reference and metadata for a given topic name
   GetOffsets :: OffsetsRequest -> Instruction OffsetsResponse -- ^ Retrieve the first and last available offsets in a given topic
   Produce :: forall v. Kafkaesque v => ProduceRequest v -> Instruction ProduceResponse -- ^ Send messages to a topic
   Fetch :: Kafkaesque v => FetchRequest -> Instruction (FetchResponse v) -- ^ Read messages from a topic
@@ -124,7 +137,7 @@ data FetchError = OffsetOutOfRange -- ^ The offset is outside the range of offse
 -- FIXME unclear when ReplicaNotAvailable is sent to the client and why the client cares
 
 -- | The name for a topic
-newtype TopicName = TopicName Text deriving (Show, Eq, IsString)
+newtype TopicName = TopicName Text deriving (Show, Eq, Ord, IsString)
 
 -- | A partition for a topic
 newtype Partition = Partition Int32 deriving (Show, Eq, Ord, Num, Enum, Ix)
