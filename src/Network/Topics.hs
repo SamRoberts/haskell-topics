@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, GADTs, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor, GADTs, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
 
 -- | A module for interacting with Kafka, either for real or with a dummy implementation.
 module Network.Topics where
@@ -68,17 +68,17 @@ type FetchResponse v = Response (Either CommonError FetchError) (FetchData v)
 
 -- | The common structure for all Kafka requests
 data Request c a = Request
-                 { _reqClientId :: ClientId -- ^ A string Kafka will include when logging any errors relating to this request
-                 , _reqTopic :: Topic -- ^ The topic that the request applies to
-                 , _reqConf :: c -- ^ Request fields that apply to all partitions
-                 , _reqParts :: [(Partition, a)] -- ^ The partitions that the request applies to, along with per-partition request fields
+                 { reqClientId :: ClientId -- ^ A string Kafka will include when logging any errors relating to this request
+                 , reqTopic :: Topic -- ^ The topic that the request applies to
+                 , reqConf :: c -- ^ Request fields that apply to all partitions
+                 , reqParts :: [(Partition, a)] -- ^ The partitions that the request applies to, along with per-partition request fields
                  }
                  deriving (Show, Eq, Functor)
 
 -- | The common structure for all Kafka responses
 data Response e a = Response
-                  { _respTopic :: Topic -- ^ The topic that the response relates to
-                  , _respParts :: [(Partition, Either e a)] -- ^ Each partition returns either an error or the response
+                  { respTopic :: Topic -- ^ The topic that the response relates to
+                  , respParts :: [(Partition, Either e a)] -- ^ Each partition returns either an error or the response
                   }
                   deriving (Show, Eq, Functor)
 
@@ -86,36 +86,36 @@ data Response e a = Response
 --
 -- A topic has a name and a range of partitions from minBound to _topicMaxPartition.
 data Topic = Topic
-           { _topicName :: TopicName -- ^ The topic name
-           , _topicMaxPartition :: Partition -- ^ The largest partition for this topic. The topic has partitions ranging from minBound to this partition.
+           { topicName :: TopicName -- ^ The topic name
+           , topicMaxPartition :: Partition -- ^ The largest partition for this topic. The topic has partitions ranging from minBound to this partition.
            }
            deriving (Show, Eq)
 
 -- | Produce request fields that apply to all partitions
 data ProduceConfig = ProduceConfig
-                   { _requiredAcks :: RequiredAcks -- ^ The number of acknowledgements the Kafka leader will wait for before responding to the client
-                   , _timeout :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for the required number of acknowledgements
+                   { produceRequiredAcks :: RequiredAcks -- ^ The number of acknowledgements the Kafka leader will wait for before responding to the client
+                   , produceTimeout :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for the required number of acknowledgements
                    }
                    deriving (Show, Eq)
 
 -- | Fetch request fields that apply to all partitions
 data FetchConfig = FetchConfig
-                 { _fetchMaxWaitTime :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for more than _fetchMinBytes to be available to respond with
-                 , _fetchMinBytes :: Size -- ^ The minimum number of bytes that Kafka should respond with, Kafka will wait up to _fetchMaxWaitTime if not enough bytes are available. Typical values would be 0 to always return immediately, or 1 to wait for at least one message.
+                 { fetchMaxWaitTime :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for more than _fetchMinBytes to be available to respond with
+                 , fetchMinBytes :: Size -- ^ The minimum number of bytes that Kafka should respond with, Kafka will wait up to _fetchMaxWaitTime if not enough bytes are available. Typical values would be 0 to always return immediately, or 1 to wait for at least one message.
                  }
                  deriving (Show, Eq)
 
 -- | Fetch request fields for each partition
 data FetchInfo = FetchInfo
-               { _fetchOffset :: Offset -- ^ The offset to start fetching messages from
-               , _fetchMaxBytes :: Size -- ^ The maximum number of message bytes in the response
+               { fetchOffset :: Offset -- ^ The offset to start fetching messages from
+               , fetchMaxBytes :: Size -- ^ The maximum number of message bytes in the response
                }
                deriving (Show, Eq)
 
 -- | The fetch response for each partition
 data FetchData v = FetchData
-                 { _fetchHighwaterMark :: Offset -- ^ The last available offset in the partition. Can be used to determine if there is still more data to be fetched
-                 , _messages :: [(Offset, v)] -- ^ The messages retrieved from Kafka, with their corresponding offsets
+                 { fetchHighwaterMark :: Offset -- ^ The last available offset in the partition. Can be used to determine if there is still more data to be fetched
+                 , fetchMessages :: [(Offset, v)] -- ^ The messages retrieved from Kafka, with their corresponding offsets
                  }
                  deriving (Show, Eq, Functor)
 
@@ -140,7 +140,7 @@ data FetchError = OffsetOutOfRange -- ^ The offset is outside the range of offse
 newtype TopicName = TopicName Text deriving (Show, Eq, Ord, IsString)
 
 -- | A partition for a topic
-newtype Partition = Partition Int32 deriving (Show, Eq, Ord, Num, Enum, Ix)
+newtype Partition = Partition Int32 deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
 
 -- | An identifying string that the client can send to Kafka, Kafka will use this string when logging any errors
 --
@@ -148,13 +148,13 @@ newtype Partition = Partition Int32 deriving (Show, Eq, Ord, Num, Enum, Ix)
 newtype ClientId = ClientId Text deriving (Show, Eq, IsString)
 
 -- | The offset of a message inside a partition
-newtype Offset = Offset Int64 deriving (Show, Eq, Ord, Num, Enum, Ix)
+newtype Offset = Offset Int64 deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
 
 -- | A timeout value, in milliseconds
-newtype Timeout = Timeout { timeoutMillis :: Int32 } deriving (Show, Eq, Ord, Num, Enum, Ix)
+newtype Timeout = Timeout { timeoutMillis :: Int32 } deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
 
 -- | The size of some data, in bytes
-newtype Size = Size Int32 deriving (Show, Eq, Ord, Num, Enum, Ix)
+newtype Size = Size Int32 deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
 
 -- | The number of acknowledgments the Kafka leader should receive before responding to a Produce request
 --
