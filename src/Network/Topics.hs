@@ -8,15 +8,12 @@ module Network.Topics where
 import           Control.Monad.Operational (Program, ProgramT)
 import qualified Control.Monad.Operational as Op
 
-import           Data.ByteString (ByteString)
 import           Data.Int (Int16, Int32, Int64)
 import           Data.Ix (Ix)
 import           Data.String (IsString)
 import           Data.Text (Text)
 
 import           Network.Kafka.Protocol (Deserializable, Serializable)
-
-import           Text.Show (showParen, showString)
 
 -- | A monad transformer for Kafka interactions
 type TopicsT m a = ProgramT Instruction m a

@@ -5,8 +5,6 @@ module Network.Topics.Memory where
     -- FIXME: want a qualified export list at some point, but easier to play around without one
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
-import           Control.Monad ((<=<))
-import           Control.Monad.Operational(ProgramView, ProgramViewT(Return, (:>>=)))
 import qualified Control.Monad.Operational as Op
 import           Control.Monad.Trans.State.Strict (State)
 import qualified Control.Monad.Trans.State.Strict as St
@@ -14,7 +12,6 @@ import qualified Control.Monad.Trans.State.Strict as St
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import           Data.Foldable (toList)
-import           Data.Int (Int64)
 import qualified Data.List as L
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
@@ -77,10 +74,9 @@ runTopicsInMemory = Op.interpretWithMonad eval
             totalSizes = scanl (\size serializedValue -> size + fromIntegral (B.length serializedValue)) 0 serializedStream
             serializedValues = (map snd . takeWhile ((<= fetchMaxBytes) . fst) . zip totalSizes) serializedStream
             deserializedValues = traverse (Get.runGet KP.deserialize) serializedValues
-            values = fmap (FetchData (partLast oldPartition) . zip [fetchOffset..]) deserializedValues
         in  ( case deserializedValues of
                 Right values -> Right (FetchData (partLast oldPartition) (zip [fetchOffset..] values))
-                Left  error  -> Left unknown
+                Left  _      -> Left unknown
             , Nothing
             ))
 
@@ -117,5 +113,5 @@ instance IncludesCommonErrors l => IncludesCommonErrors (Either l r) where
   notLeaderForPartition = Left notLeaderForPartition
 
 seqLookup :: Int -> Seq a -> Maybe a
-seqLookup ix seq =
-  if ix >= 0 && ix < S.length seq then Just (S.index seq ix) else Nothing
+seqLookup i xs =
+  if i >= 0 && i < S.length xs then Just (S.index xs i) else Nothing
