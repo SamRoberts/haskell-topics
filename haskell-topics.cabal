@@ -35,8 +35,9 @@ test-suite haskell-topics-test
   hs-source-dirs:      test
   main-is:             Main.hs
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
-  build-depends:       base
-                     , haskell-topics
+  build-depends:       haskell-topics ,
+                       base         >= 4.7
+
 
 source-repository head
   type:     git
