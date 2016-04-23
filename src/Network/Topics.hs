@@ -34,6 +34,21 @@ fetch :: Kafkaesque v => FetchRequest -> ProgramT Instruction m (FetchResponse v
 fetch = Op.singleton . Fetch
 
 -- | syntax for interacting with kafka
+--
+-- FIXME: introduce a way to work with successfull responses only, treating each partition
+-- independantly of the others ... is it possible to do that and still send responses together?
+-- Run monad up to next request along each branch, than gather requests together, send them all
+-- out, rinse, repeat?
+--
+-- FIXME: will need a consistent way to handle errors if we do this, thinking of having a global error type
+-- and the ability to recover specific error types form that, but no tracking of what errors are possible
+--
+-- FIXME: default settings for config and fetch objects, with the ability to override on a per-request basis
+-- kinda seems like I want a reader monad for config
+--
+-- FIXME: allow offset response to return something sensible on an emtpy queue. Might just use maybe?
+--
+-- FIXME: consider the suitability of (first, last) offset vs (first, next) or (first, length)
 data Instruction a where
   GetTopic :: TopicName -> Instruction (Maybe Topic) -- ^ Retrieve a topic reference and metadata for a given topic name
   GetOffsets :: OffsetsRequest -> Instruction OffsetsResponse -- ^ Retrieve the first and last available offsets in a given topic
