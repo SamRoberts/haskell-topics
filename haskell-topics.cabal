@@ -37,9 +37,12 @@ test-suite haskell-topics-test
   ghc-options:         -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:       haskell-topics ,
                        base             >= 4.7,
+                       containers       >= 0.5.6,
+                       QuickCheck       >= 2.8,
                        tasty            >= 0.11,
                        tasty-quickcheck >= 0.8,
-                       tasty-hunit      >= 0.9
+                       tasty-hunit      >= 0.9,
+                       transformers     >= 0.4.2
 
 
 source-repository head
