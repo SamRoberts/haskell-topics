@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, GADTs, GeneralizedNewtypeDeriving, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor, FlexibleInstances, FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
 
 -- | A module for interacting with Kafka, either for real or with a dummy implementation.
 module Network.Topics where
@@ -12,6 +12,8 @@ import           Data.Int (Int16, Int32, Int64)
 import           Data.Ix (Ix)
 import           Data.String (IsString)
 import           Data.Text (Text)
+
+import Data.Typeable (Typeable)
 
 import           Network.Kafka.Protocol (Deserializable, Serializable)
 
@@ -54,6 +56,28 @@ data Instruction a where
   GetOffsets :: OffsetsRequest -> Instruction OffsetsResponse -- ^ Retrieve the first and last available offsets in a given topic
   Produce :: forall v. Kafkaesque v => ProduceRequest v -> Instruction ProduceResponse -- ^ Send messages to a topic
   Fetch :: Kafkaesque v => FetchRequest -> Instruction (FetchResponse v) -- ^ Read messages from a topic
+
+data TempTopic v = TempTopic v -- really should be Topic, once we've ironed it out
+
+class Monad ts => ClassyTopics ts t | ts -> t where
+  cGetTopic :: Typeable v => TopicName -> ts (Maybe (TempTopic v))
+  cOnTopic :: ClassyTopic t v => TempTopic v -> t v a -> ts a
+
+class Monad (t v) => ClassyTopic t v where
+  cGetOffsets :: OffsetsRequest -> t v OffsetsResponse
+  cProduce :: Kafkaesque v => ProduceRequest v -> t v ProduceResponse
+  cFetch :: Kafkaesque v => FetchRequest -> t v (FetchResponse v)
+
+newtype IOTopic v a = IOTopic (IO a) deriving (Functor, Applicative, Monad)
+
+instance ClassyTopics IO IOTopic where
+  cGetTopic _ = error "called cGetTopic"
+  cOnTopic _ _ = error "called cOnTopic"
+
+instance ClassyTopic IOTopic v where
+  cGetOffsets _ = error "called cGetOffsets"
+  cProduce _ = error "called cProduce"
+  cFetch _ = error "called cFetch"
 
 -- | A request to get the first and last offset available for a given topic
 type OffsetsRequest = Request () ()
