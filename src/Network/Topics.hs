@@ -59,11 +59,11 @@ data Instruction a where
 
 data TempTopic v = TempTopic v -- really should be Topic, once we've ironed it out
 
-class Monad ts => ClassyTopics ts t | ts -> t where
+class ClassyTopics ts t | ts -> t where
   cGetTopic :: Typeable v => TopicName -> ts (Maybe (TempTopic v))
   cOnTopic :: ClassyTopic t v => TempTopic v -> t v a -> ts a
 
-class Monad (t v) => ClassyTopic t v where
+class ClassyTopic t v where
   cGetOffsets :: OffsetsRequest -> t v OffsetsResponse
   cProduce :: Kafkaesque v => ProduceRequest v -> t v ProduceResponse
   cFetch :: Kafkaesque v => FetchRequest -> t v (FetchResponse v)
