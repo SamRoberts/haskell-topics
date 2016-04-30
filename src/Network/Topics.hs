@@ -1,39 +1,22 @@
-{-# LANGUAGE DeriveFunctor, FlexibleInstances, FunctionalDependencies, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, RankNTypes, ScopedTypeVariables, TemplateHaskell #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | A module for interacting with Kafka, either for real or with a dummy implementation.
 module Network.Topics where
     -- FIXME: want a qualified export list at some point, but easier to play around without one
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
-import           Control.Monad.Operational (Program, ProgramT)
-import qualified Control.Monad.Operational as Op
-
 import           Data.Int (Int16, Int32, Int64)
 import           Data.Ix (Ix)
 import           Data.String (IsString)
 import           Data.Text (Text)
-
-import Data.Typeable (Typeable)
+import           Data.Typeable (Typeable)
 
 import           Network.Kafka.Protocol (Deserializable, Serializable)
-
--- | A monad transformer for Kafka interactions
-type TopicsT m a = ProgramT Instruction m a
-
--- | A monad for interacting with Kafka
-type Topics a = Program Instruction a
-
-getTopic :: TopicName -> ProgramT Instruction m (Maybe Topic)
-getTopic = Op.singleton . GetTopic
-
-getOffsets :: OffsetsRequest -> ProgramT Instruction m OffsetsResponse
-getOffsets = Op.singleton . GetOffsets
-
-produce :: Kafkaesque v => ProduceRequest v -> ProgramT Instruction m ProduceResponse
-produce = Op.singleton . Produce
-
-fetch :: Kafkaesque v => FetchRequest -> ProgramT Instruction m (FetchResponse v)
-fetch = Op.singleton . Fetch
 
 -- | syntax for interacting with kafka
 --
@@ -51,95 +34,45 @@ fetch = Op.singleton . Fetch
 -- FIXME: allow offset response to return something sensible on an emtpy queue. Might just use maybe?
 --
 -- FIXME: consider the suitability of (first, last) offset vs (first, next) or (first, length)
-data Instruction a where
-  GetTopic :: TopicName -> Instruction (Maybe Topic) -- ^ Retrieve a topic reference and metadata for a given topic name
-  GetOffsets :: OffsetsRequest -> Instruction OffsetsResponse -- ^ Retrieve the first and last available offsets in a given topic
-  Produce :: forall v. Kafkaesque v => ProduceRequest v -> Instruction ProduceResponse -- ^ Send messages to a topic
-  Fetch :: Kafkaesque v => FetchRequest -> Instruction (FetchResponse v) -- ^ Read messages from a topic
+class Topics ts t | ts -> t where
+  getTopic :: Typeable v => TopicName -> ts (Maybe (Topic v))
+  withPartitions :: (Partition t v) => Topic v -> [PartitionId] -> t v a -> ts [a]
 
-data TempTopic v = TempTopic v -- really should be Topic, once we've ironed it out
+  withAllPartitions :: Partition t v => Topic v -> t v a -> ts [a]
+  withAllPartitions topic = withPartitions topic (allPartitions topic)
 
-class ClassyTopics ts t | ts -> t where
-  cGetTopic :: Typeable v => TopicName -> ts (Maybe (TempTopic v))
-  cOnTopic :: ClassyTopic t v => TempTopic v -> t v a -> ts a
+class Partition t v where
+  getOffsets :: t v (Offset, Offset)
+  produce :: Kafkaesque v => [v] -> t v Offset
+  fetch :: Kafkaesque v => Offset -> Size -> t v (FetchData v)
 
-class ClassyTopic t v where
-  cGetOffsets :: OffsetsRequest -> t v OffsetsResponse
-  cProduce :: Kafkaesque v => ProduceRequest v -> t v ProduceResponse
-  cFetch :: Kafkaesque v => FetchRequest -> t v (FetchResponse v)
-
-newtype IOTopic v a = IOTopic (IO a) deriving (Functor, Applicative, Monad)
-
-instance ClassyTopics IO IOTopic where
-  cGetTopic _ = error "called cGetTopic"
-  cOnTopic _ _ = error "called cOnTopic"
-
-instance ClassyTopic IOTopic v where
-  cGetOffsets _ = error "called cGetOffsets"
-  cProduce _ = error "called cProduce"
-  cFetch _ = error "called cFetch"
-
--- | A request to get the first and last offset available for a given topic
-type OffsetsRequest = Request () ()
--- TODO should offset request allow asking for all topics in one request? That seems reasonable to me.
-
--- | The response giving the first and last offsets available for a given topic
-type OffsetsResponse = Response CommonError (Offset, Offset)
-
--- | A request to send a list of messages to Kaka
-type ProduceRequest v = Request ProduceConfig [v]
-
--- | The response after sending a list of messages to Kafka
---
--- The offset returned is the offset of the first message sent to Kafka.
-type ProduceResponse = Response (Either CommonError FetchError) Offset
--- TODO Is zip [responseOffset..] requestMessageList a valid way of determining offset for each message?
---      or is it possible that some other produce request's messages could be interleaved with mine?
-
--- | A request to fetch some messages from Kafka
-type FetchRequest = Request FetchConfig FetchInfo
-
--- | The response coming back from a fetch request to Kafka
-type FetchResponse v = Response (Either CommonError FetchError) (FetchData v)
-
--- | The common structure for all Kafka requests
-data Request c a = Request
-                 { reqClientId :: ClientId -- ^ A string Kafka will include when logging any errors relating to this request
-                 , reqTopic :: Topic -- ^ The topic that the request applies to
-                 , reqConf :: c -- ^ Request fields that apply to all partitions
-                 , reqParts :: [(Partition, a)] -- ^ The partitions that the request applies to, along with per-partition request fields
+-- | Kafka configuration which must be the same for every partition in a single request
+data KafkaConfig = KafkaConfig
+                 { kafkaClientId :: ClientId -- ^ A string Kafka will include when logging any error relating to this request
+                 , kafkaRequiredAcks :: RequiredAcks -- ^ The number of akcnowledgements the Kafka leader will wait for before responding to the client
+                 , kafkaProduceTimeout :: Timeout -- ^ The maximum time the Kafka leader should spend waiting for the required number of acknowledgments
+                 , kafkaMinBytes :: Size -- ^ The minimum number of bytes that Kafka should respond with. Typical values would be 0 to always return immediately, or 1 to wait for at least one message.
+                 , kafkaFetchTimeout :: Timeout -- ^ The maximum time the Kafka leader should spend waiting for the required amount of bytes of data to be available to send back to the client.
                  }
-                 deriving (Show, Eq, Functor)
-
--- | The common structure for all Kafka responses
-data Response e a = Response
-                  { respTopic :: Topic -- ^ The topic that the response relates to
-                  , respParts :: [(Partition, Either e a)] -- ^ Each partition returns either an error or the response
-                  }
-                  deriving (Show, Eq, Functor)
+                 deriving (Show, Eq)
 
 -- | A topic
 --
 -- A topic has a name and a range of partitions from minBound to _topicMaxPartition.
-data Topic = Topic
-           { topicName :: TopicName -- ^ The topic name
-           , topicMaxPartition :: Partition -- ^ The largest partition for this topic. The topic has partitions ranging from minBound to this partition.
-           }
-           deriving (Show, Eq)
+data Topic v = Topic
+             { topicName :: TopicName -- ^ The topic name
+             , topicMaxPartition :: PartitionId -- ^ The largest partition for this topic. The topic has partitions ranging from minBound to this partition.
+             }
+             deriving (Show, Eq)
 
--- | Produce request fields that apply to all partitions
-data ProduceConfig = ProduceConfig
-                   { produceRequiredAcks :: RequiredAcks -- ^ The number of acknowledgements the Kafka leader will wait for before responding to the client
-                   , produceTimeout :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for the required number of acknowledgements
-                   }
-                   deriving (Show, Eq)
+data FetchData v = FetchData
+                 { fetchHighwaterMark :: Offset -- ^ The last available offset in the partition. Can be used to determine if there is still more data to be fetched
+                 , fetchMessages :: [(Offset, v)] -- ^ The messages retrieved from Kafka, with their corresponding offsets
+                  }
+                  deriving (Show, Eq, Functor)
 
--- | Fetch request fields that apply to all partitions
-data FetchConfig = FetchConfig
-                 { fetchMaxWaitTime :: Timeout -- ^ The maximum time the Kafka leader should spent waiting for more than _fetchMinBytes to be available to respond with
-                 , fetchMinBytes :: Size -- ^ The minimum number of bytes that Kafka should respond with, Kafka will wait up to _fetchMaxWaitTime if not enough bytes are available. Typical values would be 0 to always return immediately, or 1 to wait for at least one message.
-                 }
-                 deriving (Show, Eq)
+allPartitions :: Topic v -> [PartitionId]
+allPartitions Topic {..} = [minBound .. topicMaxPartition]
 
 -- | Fetch request fields for each partition
 data FetchInfo = FetchInfo
@@ -148,17 +81,9 @@ data FetchInfo = FetchInfo
                }
                deriving (Show, Eq)
 
--- | The fetch response for each partition
-data FetchData v = FetchData
-                 { fetchHighwaterMark :: Offset -- ^ The last available offset in the partition. Can be used to determine if there is still more data to be fetched
-                 , fetchMessages :: [(Offset, v)] -- ^ The messages retrieved from Kafka, with their corresponding offsets
-                 }
-                 deriving (Show, Eq, Functor)
-
 -- | Common errors shared by many Kafka responses
 data CommonError = Unknown -- ^ Unknown error, no further information
                  | UnknownTopicOrPartition -- ^ The topic or partition does not exist
-                 | NotLeaderForPartition -- ^ The request was not sent to the current leader for this partition
                  deriving (Show, Eq)
 
 -- | Errors for Produce requests
@@ -176,7 +101,7 @@ data FetchError = OffsetOutOfRange -- ^ The offset is outside the range of offse
 newtype TopicName = TopicName Text deriving (Show, Eq, Ord, IsString)
 
 -- | A partition for a topic
-newtype Partition = Partition Int32 deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
+newtype PartitionId = PartitionId Int32 deriving (Show, Eq, Ord, Num, Real, Integral, Enum, Ix)
 
 -- | An identifying string that the client can send to Kafka, Kafka will use this string when logging any errors
 --
@@ -203,9 +128,9 @@ data RequiredAcks = NoResponse -- ^ Never respond to the client, this means the 
                   | WaitForAtLeast Int16 -- ^ Respond either when all in-sync replicas write the data, or when at least N in-sync replicas have written the data to their own logs
                   deriving (Show, Eq)
 
-instance Bounded Partition where
+instance Bounded PartitionId where
   minBound = 0
-  maxBound = Partition maxBound
+  maxBound = PartitionId maxBound
 
 -- | A data type that can be serialized and deserialized to and from Kafka
 class (Serializable a, Deserializable a) => Kafkaesque a
