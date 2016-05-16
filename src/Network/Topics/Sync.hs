@@ -9,7 +9,7 @@
 --{-# ANN module "HLint: ignore Use &&&" #-}
 
 -- | An in-memory interpreter for Topics programs
-module Network.Topics.Memory where
+module Network.Topics.Sync where
     -- FIXME: want a qualified export list at some point, but easier to play around without one
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 

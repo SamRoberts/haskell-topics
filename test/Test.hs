@@ -12,7 +12,7 @@ import           Test.Tasty (TestTree)
 import           Test.Tasty.QuickCheck as QC
 
 import           Network.Topics
-import           Network.Topics.Memory
+import           Network.Topics.Sync
 
 main :: IO ()
 main = T.defaultMain tests
