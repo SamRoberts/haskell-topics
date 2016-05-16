@@ -1,11 +1,11 @@
-{-# LANGUAGE OverloadedStrings, ScopedTypeVariables #-}
-
-import qualified Control.Monad.Trans.State.Strict as St
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Data.Int (Int32)
 import qualified Data.Map as M
 import           Data.Maybe (fromJust)
 import qualified Data.Sequence as S
+import           Data.Typeable (typeOf)
 
 import qualified Test.Tasty as T
 import           Test.Tasty (TestTree)
@@ -21,16 +21,10 @@ tests :: TestTree
 tests = T.testGroup "produce/offset properties"
   [ QC.testProperty "getOffsets <=< produce ~= length" $ \(messages :: [Int32]) ->
       let topicAction = do
-                          topic   <- fmap fromJust (getTopic "test")
-                          _       <- produce (Request "produce" topic (ProduceConfig WaitForAll 1000) [(0, messages)])
-                          offsets <- getOffsets (Request "offsets" topic () [(0, ())])
-                          return offsets
-          stateAction = runTopicsInMemory topicAction
-          response = St.evalState stateAction emptyTestState
-          emptyTestState = KafkaState
-                         { kafkaState = M.fromList [("test", S.singleton (KafkaPartition 0 S.empty))]
-                         }
-          expectedParts = [(0, Right (0, fromIntegral (length messages) - 1))]
-          actualParts = respParts response
-      in  expectedParts == actualParts
+            topic   <- fmap fromJust (getTopic "test")
+            withAllPartitions topic $ produce messages >> getOffsets
+          response       =  fst (runSyncTopics topicAction emptyTestState)
+          emptyTestState =  KafkaState (M.fromList [("test", (typeOf (undefined :: Int32), S.singleton (KafkaPartition 0 S.empty)))])
+          expectedParts  =  [(0, fromIntegral (length messages) - 1)]
+      in  response == expectedParts
   ]

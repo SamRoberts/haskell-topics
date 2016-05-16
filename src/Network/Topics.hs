@@ -35,16 +35,16 @@ import           Network.Kafka.Protocol (Deserializable, Serializable)
 --
 -- FIXME: consider the suitability of (first, last) offset vs (first, next) or (first, length)
 class Topics ts t | ts -> t where
-  getTopic :: Typeable v => TopicName -> ts (Maybe (Topic v))
+  getTopic :: Kafkaesque v => TopicName -> ts (Maybe (Topic v))
   withPartitions :: (Partition t v) => Topic v -> [PartitionId] -> t v a -> ts [a]
 
   withAllPartitions :: Partition t v => Topic v -> t v a -> ts [a]
   withAllPartitions topic = withPartitions topic (allPartitions topic)
 
-class Partition t v where
+class Kafkaesque v => Partition t v where
   getOffsets :: t v (Offset, Offset)
-  produce :: Kafkaesque v => [v] -> t v Offset
-  fetch :: Kafkaesque v => Offset -> Size -> t v (FetchData v)
+  produce :: [v] -> t v Offset
+  fetch :: Offset -> Size -> t v (FetchData v)
 
 -- | Kafka configuration which must be the same for every partition in a single request
 data KafkaConfig = KafkaConfig
@@ -133,7 +133,7 @@ instance Bounded PartitionId where
   maxBound = PartitionId maxBound
 
 -- | A data type that can be serialized and deserialized to and from Kafka
-class (Serializable a, Deserializable a) => Kafkaesque a
+class (Typeable a, Serializable a, Deserializable a) => Kafkaesque a
 
 instance Kafkaesque Int16
 instance Kafkaesque Int32
