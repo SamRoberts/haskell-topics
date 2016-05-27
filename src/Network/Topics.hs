@@ -20,20 +20,14 @@ import           Network.Kafka.Protocol (Deserializable, Serializable)
 
 -- | syntax for interacting with kafka
 --
--- FIXME: introduce a way to work with successfull responses only, treating each partition
--- independantly of the others ... is it possible to do that and still send responses together?
--- Run monad up to next request along each branch, than gather requests together, send them all
--- out, rinse, repeat?
---
--- FIXME: will need a consistent way to handle errors if we do this, thinking of having a global error type
--- and the ability to recover specific error types form that, but no tracking of what errors are possible
---
--- FIXME: default settings for config and fetch objects, with the ability to override on a per-request basis
--- kinda seems like I want a reader monad for config
---
 -- FIXME: allow offset response to return something sensible on an emtpy queue. Might just use maybe?
 --
 -- FIXME: consider the suitability of (first, last) offset vs (first, next) or (first, length)
+--
+-- FIXME: Some standard class or constraint list which gives us:
+--        Topics, Monad et. al., MonadReader KafkaConfig, and MonadError KafkaError (assuming I decide what to do with errors)
+--
+-- FIXME: Kafkaesque -> Topical ?
 class Topics ts t | ts -> t where
   getTopic :: Kafkaesque v => TopicName -> ts (Maybe (Topic v))
   withPartitions :: (Partition t v) => Topic v -> [PartitionId] -> t v a -> ts [a]
