@@ -29,7 +29,7 @@ import           Network.Kafka.Protocol (Deserializable, Serializable)
 --
 -- FIXME: Kafkaesque -> Topical ?
 class Topics ts t | ts -> t where
-  getTopic :: Kafkaesque v => TopicName -> ts (Maybe (Topic v))
+  getTopic :: Kafkaesque v => TopicName -> ts (Topic v)
   withPartitions :: (Partition t v) => Topic v -> [PartitionId] -> t v a -> ts [a]
 
   withAllPartitions :: Partition t v => Topic v -> t v a -> ts [a]

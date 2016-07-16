@@ -19,6 +19,7 @@ library
   ghc-options:         -Wall -O2
   exposed-modules:     Network.Topics
                        Network.Topics.Sync
+                       Network.Topics.Kafka
   build-depends:       base         >= 4.7,
                        bytestring   >= 0.10.6,
                        cereal       >= 0.5.1,

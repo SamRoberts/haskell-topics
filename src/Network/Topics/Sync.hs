@@ -12,7 +12,6 @@ module Network.Topics.Sync where
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
 import           Control.Arrow ((&&&))
-import           Control.Monad (guard)
 import           Control.Monad.State.Class (MonadState)
 import qualified Control.Monad.State.Class as St
 import           Control.Monad.Trans.State.Strict (State, runState)
@@ -54,16 +53,16 @@ partNext :: KafkaPartition -> Offset
 partNext KafkaPartition {..} = partFirst + fromIntegral (S.length partItems)
 
 instance Topics SyncTopics SyncPartition where
-  getTopic :: forall v. Kafkaesque v => TopicName -> SyncTopics (Maybe (Topic v))
+  getTopic :: forall v. Kafkaesque v => TopicName -> SyncTopics (Topic v)
   getTopic name =
-    SyncTopics (fmap mkTopic (St.gets (M.lookup name . kafkaState)))
+    SyncTopics (St.gets (mkTopic . fromJust . M.lookup name . kafkaState))
     where
-      mkTopic maybeTopicInfo = do
-        (typeRef, partitions) <- maybeTopicInfo
-        guard (typeRef == T.typeOf (undefined :: v))
-        return Topic { topicName         = name
-                     , topicMaxPartition = fromIntegral (S.length partitions - 1)
-                     }
+      mkTopic (typeRef, partitions) =
+        if (typeRef /= T.typeOf (undefined :: v))
+        then error "unexpected type"
+        else Topic { topicName         = name
+                   , topicMaxPartition = fromIntegral (S.length partitions - 1)
+                   }
 
   withPartitions :: Kafkaesque v => Topic v -> [PartitionId] -> SyncPartition v a -> SyncTopics [a]
   withPartitions Topic {..} pids action = do
