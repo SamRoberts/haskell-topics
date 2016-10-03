@@ -20,10 +20,12 @@ library
   exposed-modules:     Network.Topics
                        Network.Topics.Sync
                        Network.Topics.Kafka
+                       Network.Topics.Raw
   build-depends:       base         >= 4.7,
                        bytestring   >= 0.10.6,
                        cereal       >= 0.5.1,
                        containers   >= 0.5.6,
+                       free         >= 4.12,
                        lens         >= 4.13,
                        milena       >= 0.5.0,
                        mtl          >= 2.2.1,
