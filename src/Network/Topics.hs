@@ -36,6 +36,7 @@ class Topics ts t | ts -> t where
   withAllPartitions topic = withPartitions topic (allPartitions topic)
 
 class Kafkaesque v => Partition t v where
+  partitionId :: t v PartitionId
   getOffsets :: t v (Offset, Offset)
   produce :: [v] -> t v Offset
   fetch :: Offset -> Size -> t v (FetchData v)

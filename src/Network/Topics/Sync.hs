@@ -12,8 +12,11 @@ module Network.Topics.Sync where
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
 import           Control.Arrow ((&&&))
+import           Control.Monad.Reader.Class (MonadReader)
+import qualified Control.Monad.Reader.Class as Rd
 import           Control.Monad.State.Class (MonadState)
 import qualified Control.Monad.State.Class as St
+import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import           Control.Monad.Trans.State.Strict (State, runState)
 
 import           Data.ByteString (ByteString)
@@ -38,7 +41,8 @@ runSyncTopics :: SyncTopics a -> KafkaState -> (a, KafkaState)
 runSyncTopics = runState . syncTopics
 
 newtype SyncTopics a = SyncTopics { syncTopics :: State KafkaState a } deriving (Functor, Applicative, Monad, MonadState KafkaState)
-newtype SyncPartition v a = SyncPartition { syncPartition :: State KafkaPartition a } deriving (Functor, Applicative, Monad, MonadState KafkaPartition)
+
+newtype SyncPartition v a = SyncPartition { syncPartition :: ReaderT PartitionId (State KafkaPartition) a } deriving (Functor, Applicative, Monad, MonadState KafkaPartition, MonadReader PartitionId)
 
 newtype KafkaState = KafkaState { kafkaState :: Map TopicName (TypeRep, Seq KafkaPartition) }
 data KafkaPartition = KafkaPartition
@@ -58,13 +62,13 @@ instance Topics SyncTopics SyncPartition where
     SyncTopics (St.gets (mkTopic . fromJust . M.lookup name . kafkaState))
     where
       mkTopic (typeRef, partitions) =
-        if (typeRef /= T.typeOf (undefined :: v))
+        if typeRef /= T.typeOf (undefined :: v)
         then error "unexpected type"
         else Topic { topicName         = name
                    , topicMaxPartition = fromIntegral (S.length partitions - 1)
                    }
 
-  withPartitions :: Kafkaesque v => Topic v -> [PartitionId] -> SyncPartition v a -> SyncTopics [a]
+  withPartitions :: forall a v. Kafkaesque v => Topic v -> [PartitionId] -> SyncPartition v a -> SyncTopics [a]
   withPartitions Topic {..} pids action = do
     -- for the moment, naively assume that our topic is still valid, as it must have been valid when created
     (typeRef, partitions) <- St.gets (fromJust . M.lookup topicName . kafkaState)
@@ -72,11 +76,17 @@ instance Topics SyncTopics SyncPartition where
     St.modify (\KafkaState {..} -> KafkaState (M.insert topicName (typeRef, S.fromList newPartitions) kafkaState))
     return (catMaybes results)
     where
-      perPartition i = if fromIntegral i `elem` pids
-                       then (runState . syncPartition . fmap Just) action
-                       else (Nothing,)
+      perPartition :: Int -> KafkaPartition -> (Maybe a, KafkaPartition)
+      perPartition i =
+        let pid = fromIntegral i
+        in  if pid `elem` pids
+            then runState (runReaderT (syncPartition (fmap Just action)) pid)
+            else (Nothing,)
 
 instance Kafkaesque v => Partition SyncPartition v where
+  partitionId :: SyncPartition v PartitionId
+  partitionId = Rd.ask
+
   getOffsets :: SyncPartition v (Offset, Offset)
   getOffsets = fmap (partFirst &&& partLast) St.get
 

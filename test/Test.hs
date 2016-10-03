@@ -3,7 +3,6 @@
 
 import           Data.Int (Int32)
 import qualified Data.Map as M
-import           Data.Maybe (fromJust)
 import qualified Data.Sequence as S
 import           Data.Typeable (typeOf)
 
@@ -21,7 +20,7 @@ tests :: TestTree
 tests = T.testGroup "produce/offset properties"
   [ QC.testProperty "getOffsets <=< produce ~= length" $ \(messages :: [Int32]) ->
       let topicAction = do
-            topic   <- fmap fromJust (getTopic "test")
+            topic   <- getTopic "test"
             withAllPartitions topic $ produce messages >> getOffsets
           response       =  fst (runSyncTopics topicAction emptyTestState)
           emptyTestState =  KafkaState (M.fromList [("test", (typeOf (undefined :: Int32), S.singleton (KafkaPartition 0 S.empty)))])
