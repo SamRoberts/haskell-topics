@@ -77,12 +77,12 @@ data KafkaReq = PlaceholderKafkaReq
 data KafkaResp = PlaceholderKafkaResp
 
 instance Applicative RawReq where
-    pure a = RawReq [] (\_ -> a)
+    pure a = RawReq [] (const a)
     left <*> right =
         RawReq (requests left ++ requests right) (\responses ->
             -- TODO check number of responses
             let (lResponses, rResponses) = splitAt (length (requests left)) responses
-            in  (respond left lResponses) (respond right rResponses))
+            in  respond left lResponses (respond right rResponses))
 
 {-
 runRaw :: Raw a -> RawConf -> EitherT RawError IO a
