@@ -52,6 +52,7 @@ newtype Raw a =
     deriving (Functor, Applicative, Monad, MonadFree RawReq, MonadReader RawConf)
 
 data RawConf = RawCong
+data RawConf = RawConf
              { -- TODO config fields
              }
 
