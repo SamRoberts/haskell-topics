@@ -49,9 +49,8 @@ import           Control.Monad.Reader.Class (MonadReader)
 
 newtype Raw a =
     Raw (ReaderT RawConf RawProg a)
-    deriving (Functor, Applicative, Monad, MonadFree RawReq, MonadReader RawConf)
+  deriving (Functor, Applicative, Monad, MonadFree RawReq, MonadReader RawConf)
 
-data RawConf = RawCong
 data RawConf = RawConf
              { -- TODO config fields
              }
