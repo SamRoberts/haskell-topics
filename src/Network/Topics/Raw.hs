@@ -56,31 +56,33 @@ data RawConf = RawCong
              }
 
 newtype RawProg a =
-  RawProg (Free RawReq a)
+    RawProg (Free RawReq a)
   deriving (Functor, Monad, MonadFree RawReq)
 
 instance Applicative RawProg where
-  pure = return
-  (RawProg freeF) <*> (RawProg freeA) =
-    let freeB = case (freeF, freeA) of
-                  (Free rrpf, Free rrpa) -> Free (liftA2 (<*>) rrpf rrpa)
-                  _                      -> freeF <*> freeA
-    in  RawProg freeB
+    pure = return
+    (RawProg freeF) <*> (RawProg freeA) =
+        RawProg freeB
+      where
+        freeB = case (freeF, freeA) of
+          (Free rrpf, Free rrpa) -> Free (liftA2 (<*>) rrpf rrpa)
+          _                      -> freeF <*> freeA
 
 -- TODO have this in it's own module, with protected constructors maintaining type safety
-data RawReq a = RawReq { requests :: [KafkaReq], respond :: [KafkaResp] -> a }
-     deriving Functor
-
-instance Applicative RawReq where
-  pure a = RawReq [] (\_ -> a)
-  (RawReq lreqs lcont) <*> (RawReq rreqs rcont) =
-    RawReq (lreqs ++ rreqs) (\resps ->
-      -- TODO check number of responses
-      let (lresps, rresps) = splitAt (length lreqs) resps
-      in  (lcont lresps) (rcont rresps))
+data RawReq a =
+    RawReq { requests :: [KafkaReq], respond :: [KafkaResp] -> a }
+  deriving Functor
 
 data KafkaReq = PlaceholderKafkaReq
 data KafkaResp = PlaceholderKafkaResp
+
+instance Applicative RawReq where
+    pure a = RawReq [] (\_ -> a)
+    left <*> right =
+        RawReq (requests left ++ requests right) (\responses ->
+            -- TODO check number of responses
+            let (lResponses, rResponses) = splitAt (length (requests left)) responses
+            in  (respond left lResponses) (respond right rResponses))
 
 {-
 runRaw :: Raw a -> RawConf -> EitherT RawError IO a
