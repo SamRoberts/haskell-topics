@@ -10,10 +10,8 @@ module Network.Topics.Raw where
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
 import           Control.Applicative (liftA2)
-import           Control.Monad.Free (Free(Free))
-import           Control.Monad.Free.Class (MonadFree, liftF)
-import           Control.Monad.Reader (ReaderT, runReaderT)
-import           Control.Monad.Reader.Class (MonadReader, asks)
+import           Control.Monad.Free (Free(Free), MonadFree, liftF)
+import           Control.Monad.Reader (ReaderT, MonadReader, runReaderT, asks)
 
 import           Network.Topics
 
