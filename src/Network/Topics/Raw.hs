@@ -10,6 +10,7 @@ module Network.Topics.Raw where
     -- maybe better to define non-exported items in an Internal module, rather than hide them?
 
 import           Control.Applicative (liftA2)
+import           Control.Monad.Except (ExceptT, MonadError)
 import           Control.Monad.Free (Free(Free), MonadFree, liftF)
 import           Control.Monad.Reader (ReaderT, MonadReader, runReaderT, asks)
 
@@ -51,12 +52,19 @@ import           Network.Topics
 --     once we have responses for all request instructions, return the responses
 
 newtype Raw a =
-    Raw (ReaderT RawConf RawProg a)
-  deriving (Functor, Applicative, Monad, MonadFree RawReq, MonadReader RawConf)
+    Raw (ReaderT RawConf (ExceptT RawError RawProg) a)
+  deriving (
+    Functor
+  , Applicative
+  , Monad
+  , MonadFree RawReq
+  , MonadReader RawConf
+  , MonadError RawError
+  )
 
-data RawConf = RawConf
-             { -- TODO config fields
-             }
+data RawConf = PlaceholderRawConf
+
+data RawError = PlaceholderRawError
 
 newtype RawProg a =
     RawProg (Free RawReq a)
@@ -73,7 +81,14 @@ instance Applicative RawProg where
 
 newtype RawPart v a =
     RawPart (ReaderT (Topic v, PartitionId) Raw a)
-  deriving (Functor, Applicative, Monad, MonadFree RawReq, MonadReader (Topic v, PartitionId))
+  deriving (
+    Functor
+  , Applicative
+  , Monad
+  , MonadFree RawReq
+  , MonadReader (Topic v, PartitionId)
+  , MonadError RawError
+  )
 
 -- TODO have this in it's own module, with protected constructors maintaining type safety
 data RawReq a =
@@ -96,9 +111,6 @@ instance Topics Raw RawPart where
     --      and responses, note that we may need to know v in order to pass in
     --      appropriate serializers and deserializers ... or more likely, most of
     --      the safe constructors for RawReq will require v to be Kafkaesque.
-    -- TODO I think I need the ability to throw an error here if response is for the
-    --      wrong topic, as whatever actually "runs" the Raw program will only be
-    --      responsible for creating the KafkaResp value
     getTopic :: Kafkaesque v => TopicName -> Raw (Topic v)
     getTopic topic =
         liftF (RawReq [PlaceholderKafkaReq] (const (Topic topic undefined)))
@@ -130,8 +142,6 @@ instance Kafkaesque v => Partition RawPart v where
 {-
 runRaw :: Raw a -> RawConf -> EitherT RawError IO a
 runRaw = undefined
-
-data RawError = PlaceholderRawError
 
 data RawVars = RawVars
              { currentTopics :: TVar (Set TopicName)
